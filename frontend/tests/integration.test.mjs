@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';
 import { crearAplicacion } from '../../backend/src/app.mjs';
-import { catalogPath, createApi, eventPath, purchasePath } from '../src/api.ts';
+import { catalogPath, createApi, eventPath, purchasePath, reserveTickets } from '../src/api.ts';
 import { argentinaInput, positiveInteger, priceInput } from '../src/format.ts';
 
 test('cliente mobile con Express: compra, pago, conversación, reembolso, uso y reseña', async t => {
@@ -43,6 +43,9 @@ test('cliente mobile con Express: compra, pago, conversación, reembolso, uso y 
   assert.ok((await organizer.get('/mis-eventos')).some(event => event.id === first.id));
   await assert.rejects(other.get(path + '/compras'), { code: 'NO_AUTORIZADO' });
 
+  let otherDetail = await other.get(path);
+  const refreshOtherDetail = async () => { otherDetail = await other.get(path); };
+  assert.equal(otherDetail.tipos[0].agotado, false);
   const pending = await book('3');
   const purchase = purchasePath(first.id, pending.id);
   assert.equal(pending.totalPactado, '376.50');
@@ -51,7 +54,10 @@ test('cliente mobile con Express: compra, pago, conversación, reembolso, uso y 
   assert.equal(soldOut.agotado, true);
   assert.equal(soldOut.precioRepresentativo, '125.50');
   assert.equal((await organizer.get(path + '/compras')).tipos[0].disponibilidad, '0');
-  await assert.rejects(book('1'), { code: 'SIN_CUPO' });
+  await assert.rejects(reserveTickets(other, path, { tipoId: ticket, cantidad: '1' }, refreshOtherDetail),
+    { code: 'SIN_CUPO', message: 'No hay cupo suficiente.' });
+  assert.equal(otherDetail.tipos[0].agotado, true);
+  assert.equal(otherDetail.tipos[0].disponibilidad, '0');
 
   assert.equal((await buyer.send(purchase + '/pagar', 'POST')).realizada, true);
   assert.equal((await buyer.get(purchase)).estado, 'CONFIRMADA');

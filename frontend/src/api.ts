@@ -1,3 +1,5 @@
+import type { Purchase } from './contracts';
+
 export class ApiError extends Error {
   readonly code: string;
   readonly uncertain: boolean;
@@ -66,6 +68,20 @@ export function createApi(baseUrl = '', userId?: string, transport = fetch) {
 }
 
 export type Api = ReturnType<typeof createApi>;
+
+export async function reserveTickets(api: Api, path: string, selection: { tipoId: string; cantidad: string },
+  refreshEvent: () => Promise<unknown>) {
+  try {
+    return await api.send<Purchase>(path + '/compras', 'POST', selection);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'SIN_CUPO') {
+      // The event query reports its own read error. Keep the reservation rejection for the buyer.
+      await refreshEvent().catch(() => {});
+    }
+    throw error;
+  }
+}
+
 export const eventPath = (id: string) => '/eventos/' + encodeURIComponent(id);
 export const purchasePath = (eventId: string, purchaseId: string) =>
   eventPath(eventId) + '/compras/' + encodeURIComponent(purchaseId);
