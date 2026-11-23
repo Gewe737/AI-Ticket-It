@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Linking } from 'react-native';
-import { catalogPath, eventPath, type CatalogFilters } from './api';
+import { catalogPath, eventPath, reserveTickets, type CatalogFilters } from './api';
 import { hasRole, nameOf, type CatalogEvent, type Category, type EventDetail, type EventSummary,
   type Operation, type Purchase, type Review, type Ticket, type User } from './contracts';
 import { ars, dateLabel, positiveInteger } from './format';
@@ -183,7 +183,7 @@ export function EventScreen({ api, user, users, open, eventId }: ScreenProps & {
         <Button label="Crear compra" variant="primary"
           disabled={!ticketAvailable || purchaseAction.disabled || event.loading || purchases.loading}
           onPress={() => { void purchaseAction.run(
-            async () => api.send<Purchase>(path + '/compras', 'POST', { tipoId: ticket, cantidad: positiveInteger(quantity) }),
+            () => reserveTickets(api, path, { tipoId: ticket, cantidad: positiveInteger(quantity) }, event.refresh),
             purchase => 'Compra ' + purchase.id + ' registrada. Total pactado: ' + ars(purchase.totalPactado) + '.',
             refreshPurchases,
             setCreated,
