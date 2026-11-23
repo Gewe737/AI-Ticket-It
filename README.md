@@ -17,7 +17,7 @@ Usar Node.js 22.13 o superior. Instalar con `npm ci` por separado en backend y f
 
 En backend: `npm test`. En frontend: `npm test` y `npm run check`.
 
-Verificación de esta importación (23/11/2026): 38 pruebas pasaron y TypeScript no informó errores. En este entorno de Windows se ejecutaron directamente con Node y las opciones `--preserve-symlinks --preserve-symlinks-main`, debido a un error de permisos del lanzador npm. Esto no sustituye una comprobación visual en un teléfono ni demuestra una compilación nativa de producción.
+Verificación del 23/11/2026 sobre el commit `3e1629d`. Pasaron 32 pruebas de backend, 12 de frontend y la comprobación de TypeScript. El flujo principal y los casos de borde se probaron en un teléfono Android físico con Expo Go. [Registro de verificación en Android](frontend/README.md#registro-de-verificación-en-android)
 
 ## Flujo de trabajo
 

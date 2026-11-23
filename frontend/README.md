@@ -48,7 +48,7 @@ npx.cmd expo install --check
 npm.cmd run export
 ```
 
-`npm test` ejecuta cinco pruebas del cliente y una integración HTTP que arranca Express en un puerto efímero. La integración verifica publicación, catálogo, favoritos, permisos, reserva, pago, conversación, cancelación, reembolso y cupo liberado. También verifica uso y reseña con el reloj de prueba de Express en los momentos habilitados. `npm run export` genera bundles para Android e iOS en `dist/`.
+`npm test` ejecuta 12 pruebas de frontend, incluida una integración HTTP que arranca Express en un puerto efímero. La integración verifica publicación, catálogo, favoritos, permisos, reserva, pago, conversación, cancelación, reembolso y cupo liberado. También verifica uso y reseña con el reloj de prueba de Express en los momentos habilitados. `npm run export` genera bundles para Android e iOS en `dist/`.
 
 ### Expo en este entorno de Windows
 
@@ -72,3 +72,20 @@ En esta PC, la API escucha en `http://192.168.1.34:3000/api` y Expo anuncia `exp
 5. Volvé a **Martín Paz** → **Mis compras**. Confirmá que se ve la respuesta y que la disponibilidad bajó en una entrada. Pulsá **Cancelar compra** y confirmá. El detalle debe mostrar **REEMBOLSADA**, **ARS 125,50** de reembolso y el cupo inicial de **General**. La conversación debe seguir disponible.
 
 En el teléfono, elegí el perfil organizador y creá un evento que empiece más tarde, con dos tipos de entrada. Cambiá a un comprador, reservá y simulá el pago. Enviá un mensaje, cambiá al organizador y respondé desde las compras del evento. Volvé al comprador, cancelá y verificá el importe reembolsado, el cupo disponible y la conversación. Para verificar uso y reseña en el teléfono, reservá y pagá otra compra antes del inicio, marcala utilizada desde el inicio y publicá la reseña una vez terminado el evento.
+
+## Registro de verificación en Android
+
+El 23/11/2026 se probó el commit `3e1629d` de `main` en un teléfono Android físico con Expo Go y SDK 54, conectado al backend local. Pasaron 32 pruebas de backend, 12 de frontend y TypeScript.
+
+| Caso de borde | Cómo se probó y resultado observado |
+| --- | --- |
+| Reabrir un evento durante una reserva | Con una demora controlada en la respuesta, Martín inició la reserva, salió y reabrió el evento. Siguió viendo **Reserva en curso…** con el botón deshabilitado. La API confirmó una sola compra y el cupo bajó de 3 a 2. |
+| Otro comprador agota el cupo | Mientras Martín veía 1 entrada General disponible, Elena reservó esa última entrada. El intento de Martín mostró el rechazo y cambió General a **Agotada** sin recargar manualmente. |
+| La recarga del chat falla tras enviar | Se interrumpieron solo las lecturas del chat. Los dos mensajes confirmados siguieron visibles con el aviso de error. Al restablecer la lectura, aparecieron en orden y una sola vez cada uno. |
+| Los controles de compra cambian al inicio | El comprador dejó abierto el detalle del evento. Al llegar la hora de inicio desaparecieron los controles de **Comprar entradas** sin recargar. |
+| Volver a la app después del inicio | Con los controles de compra visibles, el comprador dejó Expo Go en segundo plano mediante **Inicio**. Volvió desde **Recientes** después del inicio y conservó el mismo detalle, con los controles ocultos sin recargar. Un intento anterior en el que Expo Go volvió al selector quedó inconcluso y se repitió. |
+| Uso al inicio y reseña al finalizar | La organizadora dejó abierto el detalle de una compra confirmada y vio aparecer **Marcar compra completa como utilizada** al inicio. Después de registrar el uso, el comprador dejó abierto el evento y vio aparecer el formulario de reseña al finalizar. |
+
+En el recorrido completo, una compra pagada quedó **REEMBOLSADA** por **ARS 125,50**, el cupo volvió a **3 de 3** y la API conservó los tres mensajes de la conversación. En otra compra se registró el estado **UTILIZADA**, se publicó una reseña de **5/5** desde el teléfono y la API informó una reputación de **5,0**.
+
+Las pruebas de demora y corte de lectura usaron un intermediario HTTP temporal fuera del repositorio. Los casos horarios se probaron con el reloj real. El alcance de la prueba en el teléfono fue la ejecución de desarrollo con Expo Go.
