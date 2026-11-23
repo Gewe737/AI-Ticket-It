@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "AI Ticket It",
+    "slug": "ai-ticket-it",
+    "version": "1.0.0",
+    "platforms": ["android", "ios"],
+    "userInterfaceStyle": "light"
+  }
+}

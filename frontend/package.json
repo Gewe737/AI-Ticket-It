@@ -1,0 +1,24 @@
+{
+  "name": "ai-ticket-it-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --go --lan",
+    "check": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "export": "expo export --platform android --platform ios"
+  },
+  "dependencies": {
+    "expo": "~54.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}
+
