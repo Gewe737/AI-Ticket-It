@@ -8,6 +8,8 @@ import type { ScreenProps } from './navigation';
 import { errorText, useAction, useQuery, useResource } from './state';
 import { ActionStatus, Body, Button, Card, Field, Heading, Notice, QueryStatus, Row, Title } from './ui';
 
+import { useEventPhase } from './useEventPhase';
+
 export function EventCard({ event, open }: { event: EventSummary | CatalogEvent; open: () => void }) {
   const cheapest = event.tipos.filter(ticket => ticket.precio === event.precioRepresentativo);
   const availability = event.agotado ? 'Agotado'
@@ -130,13 +132,14 @@ export function EventScreen({ api, user, users, open, eventId }: ScreenProps & {
   }
 
   const data = event.data;
+  const phase = useEventPhase(data);
   if (!data) return <><Heading>Evento</Heading><QueryStatus query={event} /></>;
   const saved = favorites.data?.includes(eventId);
   const own = data.organizadorId === user.id;
   const related = purchases.data?.filter(purchase => purchase.eventoId === eventId);
   const myReview = data.resenias.some(review => review.compradorId === user.id);
-  const reviewEligible = related?.some(purchase => purchase.estado === 'UTILIZADA') && Date.now() >= Date.parse(data.fin);
-  const beforeStart = Date.now() < Date.parse(data.inicio);
+  const reviewEligible = related?.some(purchase => purchase.estado === 'UTILIZADA') && phase === 'ended';
+  const beforeStart = phase === 'upcoming';
   const ticketAvailable = data.tipos.some(type => type.id === ticket && !type.agotado);
   const canShowPurchase = buyer && !own && (beforeStart || purchaseAction.needsCheck || purchaseAction.feedback);
 

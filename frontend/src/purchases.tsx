@@ -8,6 +8,8 @@ import type { ScreenProps } from './navigation';
 import { useAction, useQuery, useResource } from './state';
 import { ActionStatus, Body, Button, Card, Field, Heading, QueryStatus, Row, Title } from './ui';
 
+import { useEventPhase } from './useEventPhase';
+
 export function PurchaseCard({ purchase, label, open }: { purchase: Purchase; label: string; open: () => void }) {
   return <Card>
     <Title>{label}</Title>
@@ -67,7 +69,8 @@ export function PurchaseScreen({ api, user, users, open, eventId, purchaseId }: 
   const ticket = eventData?.tipos.find(type => type.id === data?.tipoId);
   const buyer = data?.compradorId === user.id;
   const organizer = eventData?.organizadorId === user.id && hasRole(user, 'organizador');
-  const started = eventData ? Date.now() >= Date.parse(eventData.inicio) : undefined;
+  const phase = useEventPhase(eventData);
+  const started = phase === undefined ? undefined : phase !== 'upcoming';
   const disabled = action.disabled || purchase.loading || event.loading;
 
   return <>
