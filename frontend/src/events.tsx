@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Linking } from 'react-native';
 import { catalogPath, eventPath, type CatalogFilters } from './api';
 import { hasRole, nameOf, type CatalogEvent, type Category, type EventDetail, type EventSummary,
   type Operation, type Purchase, type Review, type Ticket, type User } from './contracts';
 import { ars, dateLabel, positiveInteger } from './format';
+import type { ReservationSession } from './reservations';
 import type { ScreenProps } from './navigation';
 import { errorText, useAction, useQuery, useResource } from './state';
 import { ActionStatus, Body, Button, Card, Field, Heading, Notice, QueryStatus, Row, Title } from './ui';
@@ -99,18 +100,21 @@ function ReviewCard({ review, users, prior }: {
   </Card>;
 }
 
-export function EventScreen({ api, user, users, open, eventId }: ScreenProps & { eventId: string }) {
+export function EventScreen({ api, user, users, open, eventId, reservations }: ScreenProps & { eventId: string; reservations: ReservationSession }) {
   const path = eventPath(eventId);
   const event = useQuery<EventDetail>(api, path);
   const buyer = hasRole(user, 'comprador');
   const favorites = useQuery<string[]>(api, buyer ? '/favoritos' : null);
   const purchases = useQuery<Purchase[]>(api, buyer ? '/mis-compras' : null);
   const favoriteAction = useAction();
-  const purchaseAction = useAction();
+  const purchaseAction = reservations.forEvent(user.id, eventId);
+  const reservation = useSyncExternalStore(purchaseAction.subscribe, purchaseAction.snapshot);
+  const reservationBusy = reservation.status === 'sending' || reservation.status === 'checking';
+  const reservationDisabled = reservationBusy || reservation.status === 'uncertain';
   const reviewAction = useAction();
   const [ticket, setTicket] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [created, setCreated] = useState<Purchase>();
+  const created = reservation.status === 'confirmed' ? reservation.purchase : undefined;
   const [score, setScore] = useState(5);
   const [comment, setComment] = useState('');
   const [linkError, setLinkError] = useState('');
@@ -119,6 +123,12 @@ export function EventScreen({ api, user, users, open, eventId }: ScreenProps & {
     const [latest] = await Promise.all([purchases.refresh(), event.refresh()]);
     return latest;
   }
+
+  const refreshEvent = event.refresh;
+  const refreshList = purchases.refresh;
+  useEffect(() => {
+    if (created) void Promise.all([refreshEvent(), refreshList()]).catch(() => {});
+  }, [created, refreshEvent, refreshList]);
 
   async function openMedia(url: string) {
     setLinkError('');
@@ -138,17 +148,17 @@ export function EventScreen({ api, user, users, open, eventId }: ScreenProps & {
   const reviewEligible = related?.some(purchase => purchase.estado === 'UTILIZADA') && Date.now() >= Date.parse(data.fin);
   const beforeStart = Date.now() < Date.parse(data.inicio);
   const ticketAvailable = data.tipos.some(type => type.id === ticket && !type.agotado);
-  const canShowPurchase = buyer && !own && (beforeStart || purchaseAction.needsCheck || purchaseAction.feedback);
+  const canShowPurchase = buyer && !own && (beforeStart || reservation.status !== 'idle');
 
   return <>
     <Heading>{data.nombre}</Heading>
-    <QueryStatus query={event} disabled={purchaseAction.busy || reviewAction.busy} />
+    <QueryStatus query={event} disabled={reservationBusy || reviewAction.busy} />
     <Body muted>{data.categoria.nombre} · {nameOf(users, data.organizadorId)}</Body>
     <Body>{data.descripcion}</Body>
     <Body>Inicio · {dateLabel(data.inicio)} (Argentina)</Body>
     <Body>Fin · {dateLabel(data.fin)} (Argentina)</Body>
     <Body>Reputación del organizador · {data.reputacion.descripcion}</Body>
-    <Button label="Actualizar evento" disabled={event.loading || purchaseAction.busy || reviewAction.busy}
+    <Button label="Actualizar evento" disabled={event.loading || reservationBusy || reviewAction.busy}
       onPress={() => { (buyer ? refreshPurchases() : event.refresh()).catch(() => {}); }} />
     {buyer && <>
       <QueryStatus query={favorites} label="Reintentar favoritos" />
@@ -176,21 +186,30 @@ export function EventScreen({ api, user, users, open, eventId }: ScreenProps & {
       {beforeStart && !data.agotado && <>
         <Body>Elegí un tipo</Body>
         <Row>{data.tipos.map(type => <Button key={type.id} selected={ticket === type.id}
-          label={type.nombre + (type.agotado ? ' · Agotada' : '')} disabled={type.agotado || purchaseAction.disabled}
+          label={type.nombre + (type.agotado ? ' · Agotada' : '')} disabled={type.agotado || reservationDisabled}
           onPress={() => setTicket(type.id)} />)}</Row>
         <Field label="Cantidad de entradas" value={quantity} onChangeText={setQuantity}
-          keyboardType="number-pad" editable={!purchaseAction.disabled} />
+          keyboardType="number-pad" editable={!reservationDisabled} />
         <Button label="Crear compra" variant="primary"
-          disabled={!ticketAvailable || purchaseAction.disabled || event.loading || purchases.loading}
+          disabled={!ticketAvailable || reservationDisabled || event.loading || purchases.loading}
           onPress={() => { void purchaseAction.run(
             async () => api.send<Purchase>(path + '/compras', 'POST', { tipoId: ticket, cantidad: positiveInteger(quantity) }),
             purchase => 'Compra ' + purchase.id + ' registrada. Total pactado: ' + ars(purchase.totalPactado) + '.',
-            refreshPurchases,
-            setCreated,
           ); }} />
       </>}
       {data.agotado && <Body>El evento está agotado.</Body>}
-      <ActionStatus action={purchaseAction} />
+      {reservation.status === 'sending' && <Body>Reserva en curso…</Body>}
+      {reservation.status === 'confirmed' && <Notice>{reservation.message}</Notice>}
+      {reservation.status === 'rejected' && <Notice error>{reservation.message}</Notice>}
+      {reservation.status === 'uncertain' && <>
+        <Notice error>{reservation.message} La reserva pudo haberse registrado. Revisá tus compras antes de repetirla.</Notice>
+        <Button label="Consultar estado" onPress={() => { void purchaseAction.check(async () => {
+          const [list, detail] = await Promise.all([purchases.refresh(), event.refresh()]);
+          return list !== undefined && detail !== undefined;
+        }); }} />
+      </>}
+      {reservation.status === 'checking' && <Body>Consultando tus compras…</Body>}
+      {reservation.status === 'checked' && <Body>Revisá tus compras para este evento antes de volver a reservar.</Body>}
       {created && <Button label="Ver compra registrada" onPress={() =>
         open({ page: 'purchase', eventId, purchaseId: created.id })} />}
     </Card>}

@@ -4,6 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { createApi, type CatalogFilters } from './src/api';
 import { hasRole, nameOf, type User } from './src/contracts';
 import { Catalog, EventScreen, Favorites } from './src/events';
+import { ReservationSession } from './src/reservations';
 import type { Route } from './src/navigation';
 import { CreateEvent, EventPurchasesScreen, Organizer } from './src/organizer';
 import { Messages, PurchaseScreen, Purchases } from './src/purchases';
@@ -15,6 +16,7 @@ const publicApi = createApi(baseUrl);
 const catalog: Route = { page: 'catalog' };
 
 export default function App() {
+  const [reservations] = useState(() => new ReservationSession());
   const users = useQuery<User[]>(publicApi, '/usuarios-demo');
   const [user, setUser] = useState<User>();
   const [choosing, setChoosing] = useState(true);
@@ -39,13 +41,13 @@ export default function App() {
             <Body muted>{candidate.roles.join(' · ')}</Body>
             <Button label={'Usar perfil de ' + candidate.nombre} variant="primary" onPress={() => choose(candidate)} />
           </Card>)}
-        </ScrollView> : <Session key={user.id} user={user} users={users.data ?? []} choose={() => setChoosing(true)} />}
+        </ScrollView> : <Session reservations={reservations} key={user.id} user={user} users={users.data ?? []} choose={() => setChoosing(true)} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   </SafeAreaProvider>;
 }
 
-function Session({ user, users, choose }: { user: User; users: User[]; choose: () => void }) {
+function Session({ user, users, choose, reservations }: { reservations: ReservationSession; user: User; users: User[]; choose: () => void }) {
   const api = useMemo(() => createApi(baseUrl, user.id), [user.id]);
   const [routes, setRoutes] = useState<Route[]>([catalog]);
   const [filters, setFilters] = useState<CatalogFilters>({ texto: '', categoriaId: '', criterio: 'fecha', sentido: 'asc' });
@@ -69,7 +71,7 @@ function Session({ user, users, choose }: { user: User; users: User[]; choose: (
       case 'purchases': return <Purchases {...props} />;
       case 'organizer': return <Organizer {...props} />;
       case 'create': return <CreateEvent {...props} />;
-      case 'event': return <EventScreen {...props} eventId={route.eventId} />;
+      case 'event': return <EventScreen reservations={reservations} {...props} eventId={route.eventId} />;
       case 'eventPurchases': return <EventPurchasesScreen {...props} eventId={route.eventId} />;
       case 'purchase': return <PurchaseScreen {...props} eventId={route.eventId} purchaseId={route.purchaseId} />;
       case 'messages': return <Messages {...props} eventId={route.eventId} purchaseId={route.purchaseId} />;
