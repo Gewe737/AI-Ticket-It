@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createApi, eventPath, purchasePath, catalogPath } from '../src/api.ts';
+import { mergeMessages } from '../src/messages.ts';
 import { ars, priceInput, positiveInteger, argentinaInput, dateLabel } from '../src/format.ts';
 
 const result = (body, status = 200) => new Response(JSON.stringify(body), { status });
@@ -60,4 +61,17 @@ test('fechas argentinas estrictas con zona y cambio de día', () => {
   assert.equal(argentinaInput('29/02/2032 23:15'), '2032-02-29T23:15:00-03:00');
   for (const date of ['29/02/2030 23:15', '31/04/2030 09:00', '01/01/2030 24:00']) assert.throws(() => argentinaInput(date));
   assert.match(dateLabel('2030-01-01T02:30:00Z'), /31\/12\/2029.*23:30/);
+});
+test('la conversación conserva los envíos confirmados entre consultas y reconcilia por compra y secuencia', () => {
+  const message = (compraId, secuencia, texto) => ({ compraId, secuencia, texto, autorId: 'Ana', enviado: '2030-04-05T12:00:00Z' });
+  const first = message('A', 1, 'Primero');
+  const second = message('A', 2, 'Segundo');
+  const third = message('A', 3, 'Tercero');
+  const other = message('B', 2, 'Otra compra');
+  const staleHistory = [first];
+  let confirmed = mergeMessages('A', [], [second]);
+  confirmed = mergeMessages('A', confirmed, [third]);
+  assert.deepEqual(mergeMessages('A', confirmed, staleHistory), [first, second, third]);
+  assert.deepEqual(mergeMessages('A', confirmed, [third, first, second]), [first, second, third]);
+  assert.deepEqual(mergeMessages('B', confirmed, [other]), [other]);
 });

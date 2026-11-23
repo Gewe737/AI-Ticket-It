@@ -4,6 +4,7 @@ import { eventPath, purchasePath } from './api';
 import { hasRole, nameOf, type EventDetail, type Message, type Operation, type Purchase, type User } from './contracts';
 import { Availability } from './events';
 import { ars, dateLabel } from './format';
+import { mergeMessages } from './messages';
 import type { ScreenProps } from './navigation';
 import { useAction, useQuery, useResource } from './state';
 import { ActionStatus, Body, Button, Card, Field, Heading, QueryStatus, Row, Title } from './ui';
@@ -121,15 +122,14 @@ export function Messages({ api, user, users, eventId, purchaseId }: PurchaseScre
   const messages = useQuery<Message[]>(api, path);
   const action = useAction();
   const [text, setText] = useState('');
-  const [lastSent, setLastSent] = useState<Message>();
-  const list = messages.data && lastSent && !messages.data.some(item => item.secuencia === lastSent.secuencia)
-    ? [...messages.data, lastSent] : messages.data;
+  const [confirmed, setConfirmed] = useState<Message[]>([]);
+  const list = messages.data && mergeMessages(purchaseId, confirmed, messages.data);
 
   function send() {
     void action.run(() => api.send<Message>(path, 'POST', { texto: text.trim() }),
       () => 'Mensaje enviado.', messages.refresh, message => {
         setText('');
-        setLastSent(message);
+        setConfirmed(previous => mergeMessages(purchaseId, previous, [message]));
       });
   }
 
